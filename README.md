@@ -12,6 +12,22 @@
 
 ---
 
+## 📸 Screenshots
+
+### 📊 Overview Dashboard
+![Overview](docs/screenshots/overview.png)
+
+### 🔬 Statistical Hypothesis Testing
+![Hypothesis Tests](docs/screenshots/hypothesis.png)
+
+### 🤖 Real-Time Churn Prediction
+![Predict Churn](docs/screenshots/predict.png)
+
+### 📈 Model Performance
+![Model Performance](docs/screenshots/performance.png)
+
+---
+
 ## 📐 Architecture
 
 ```
