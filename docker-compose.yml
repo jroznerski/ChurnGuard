@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  # ── Train model on startup ─────────────────────────────────────────────────
+  trainer:
+    build:
+      context: .
+      target: base
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    command: python scripts/train_model.py --generate
+    environment:
+      - APP_ENV=production
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      target: api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - APP_ENV=production
+      - MODEL_PATH=models/churn_model.joblib
+      - METADATA_PATH=models/metadata.json
+      - DATA_RAW_PATH=data/raw/customers.csv
+      - LOG_LEVEL=INFO
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ── Streamlit dashboard ────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - MODEL_PATH=models/churn_model.joblib
+      - METADATA_PATH=models/metadata.json
+      - DATA_RAW_PATH=data/raw/customers.csv
+    depends_on:
+      trainer:
+        condition: service_completed_successfully
+
+volumes:
+  data:
+  models:
+  logs:

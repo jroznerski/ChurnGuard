@@ -1,0 +1,82 @@
+app:
+  name: ChurnGuard
+  description: Customer Churn Intelligence Platform
+  version: "1.0.0"
+  environment: development
+
+data:
+  raw_path: data/raw/customers.csv
+  processed_path: data/processed/customers_processed.parquet
+  test_size: 0.2
+  random_state: 42
+  target_column: churn
+
+features:
+  categorical:
+    - gender
+    - senior_citizen
+    - partner
+    - dependents
+    - phone_service
+    - multiple_lines
+    - internet_service
+    - online_security
+    - online_backup
+    - device_protection
+    - tech_support
+    - streaming_tv
+    - streaming_movies
+    - contract
+    - paperless_billing
+    - payment_method
+  numerical:
+    - tenure
+    - monthly_charges
+    - total_charges
+  engineered:
+    - tenure_group
+    - charges_per_month_ratio
+    - service_count
+    - has_premium_services
+
+model:
+  name: xgboost
+  params:
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    scale_pos_weight: 2.5
+    eval_metric: auc
+    use_label_encoder: false
+    random_state: 42
+  cross_val_folds: 5
+  threshold: 0.45
+
+hypothesis_tests:
+  alpha: 0.05
+  tests:
+    - name: contract_vs_churn
+      description: "H1: Contract type significantly affects churn rate"
+      test: chi_square
+    - name: monthly_charges_vs_churn
+      description: "H2: Churners pay higher monthly charges"
+      test: welch_ttest
+    - name: tenure_vs_churn
+      description: "H3: Churners have shorter tenure"
+      test: mann_whitney
+    - name: senior_vs_churn
+      description: "H4: Senior citizens churn at a different rate"
+      test: chi_square
+    - name: service_count_vs_churn
+      description: "H5: Number of services differs between churners and non-churners"
+      test: mann_whitney
+
+api:
+  prefix: /api/v1
+  docs_url: /docs
+  redoc_url: /redoc
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://localhost:8501"
