@@ -19,7 +19,6 @@ import pandas as pd
 from loguru import logger
 from scipy import stats
 
-
 ALPHA = 0.05
 
 

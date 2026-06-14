@@ -6,11 +6,12 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import argparse
+
 from loguru import logger
 
+from scripts.generate_data import generate_customers
 from src.pipeline.data_ingestion import DataIngestionPipeline
 from src.pipeline.model_trainer import ModelTrainer
-from scripts.generate_data import generate_customers
 
 
 def main() -> None:

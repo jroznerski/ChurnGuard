@@ -65,9 +65,9 @@ class ModelTrainer:
         )
 
     def _evaluate(
-        self, pipeline: Pipeline, X_test: pd.DataFrame, y_test: pd.Series
+        self, pipeline: Pipeline, x_test: pd.DataFrame, y_test: pd.Series
     ) -> dict[str, Any]:
-        proba = pipeline.predict_proba(X_test)[:, 1]
+        proba = pipeline.predict_proba(x_test)[:, 1]
         y_pred = (proba >= self.threshold).astype(int)
         auc = roc_auc_score(y_test, proba)
         f1 = f1_score(y_test, y_pred)
@@ -84,26 +84,26 @@ class ModelTrainer:
         }
 
     def _cross_validate(
-        self, pipeline: Pipeline, X: pd.DataFrame, y: pd.Series
+        self, pipeline: Pipeline, x: pd.DataFrame, y: pd.Series
     ) -> dict[str, float]:
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=self.random_state)
-        scores = cross_val_score(pipeline, X, y, cv=cv, scoring="roc_auc", n_jobs=-1)
+        scores = cross_val_score(pipeline, x, y, cv=cv, scoring="roc_auc", n_jobs=-1)
         logger.info(f"CV AUC: {scores.mean():.4f} ± {scores.std():.4f}")
         return {"cv_auc_mean": round(scores.mean(), 4), "cv_auc_std": round(scores.std(), 4)}
 
     def _compute_shap(
-        self, pipeline: Pipeline, X_test: pd.DataFrame, n_samples: int = 500
+        self, pipeline: Pipeline, x_test: pd.DataFrame, n_samples: int = 500
     ) -> dict[str, float]:
         feature_engineer = pipeline.named_steps["feature_engineer"]
         preprocessor = pipeline.named_steps["preprocessor"]
         classifier = pipeline.named_steps["classifier"]
 
-        X_eng = feature_engineer.transform(X_test.head(n_samples))
-        X_proc = preprocessor.transform(X_eng)
+        x_eng = feature_engineer.transform(x_test.head(n_samples))
+        x_proc = preprocessor.transform(x_eng)
         feature_names = get_feature_names(preprocessor)
 
         explainer = shap.TreeExplainer(classifier)
-        shap_values = explainer.shap_values(X_proc)
+        shap_values = explainer.shap_values(x_proc)
         mean_abs = np.abs(shap_values).mean(axis=0)
         importance = dict(zip(feature_names, mean_abs.tolist()))
         top = sorted(importance.items(), key=lambda x: x[1], reverse=True)[:15]
@@ -112,29 +112,29 @@ class ModelTrainer:
     def train(self, df: pd.DataFrame) -> dict[str, Any]:
         target = "churn"
         drop_cols = [target, "customer_id"]
-        X = df.drop(columns=[c for c in drop_cols if c in df.columns])
+        x = df.drop(columns=[c for c in drop_cols if c in df.columns])
         y = df[target]
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=self.test_size, random_state=self.random_state, stratify=y
+        x_train, x_test, y_train, y_test = train_test_split(
+            x, y, test_size=self.test_size, random_state=self.random_state, stratify=y
         )
 
         pipeline = self._build_pipeline()
         logger.info("Starting cross-validation …")
-        cv_metrics = self._cross_validate(pipeline, X_train, y_train)
+        cv_metrics = self._cross_validate(pipeline, x_train, y_train)
 
         logger.info("Training final model …")
-        pipeline.fit(X_train, y_train)
+        pipeline.fit(x_train, y_train)
 
-        eval_metrics = self._evaluate(pipeline, X_test, y_test)
+        eval_metrics = self._evaluate(pipeline, x_test, y_test)
         logger.info("Computing SHAP feature importances …")
-        shap_importances = self._compute_shap(pipeline, X_test)
+        shap_importances = self._compute_shap(pipeline, x_test)
 
         metadata: dict[str, Any] = {
             "model_name": "XGBoostClassifier",
             "threshold": self.threshold,
-            "train_size": len(X_train),
-            "test_size": len(X_test),
+            "train_size": len(x_train),
+            "test_size": len(x_test),
             "churn_rate": round(float(y.mean()), 4),
             "metrics": {**cv_metrics, **eval_metrics},
             "shap_feature_importance": shap_importances,

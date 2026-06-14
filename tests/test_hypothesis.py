@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from scripts.generate_data import generate_customers
-from src.analysis.hypothesis_testing import HypothesisTester, HypothesisResult
+from src.analysis.hypothesis_testing import HypothesisResult, HypothesisTester
 
 
 @pytest.fixture(scope="module")

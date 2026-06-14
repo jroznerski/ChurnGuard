@@ -12,7 +12,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from scripts.generate_data import generate_customers
-from src.pipeline.data_ingestion import DataIngestionPipeline, DataIngestionError
+from src.pipeline.data_ingestion import DataIngestionError, DataIngestionPipeline
 from src.pipeline.preprocessing import FeatureEngineer, build_preprocessor
 
 
@@ -66,22 +66,22 @@ class TestPreprocessor:
     def test_output_is_array(self, sample_df):
         from sklearn.pipeline import Pipeline
 
-        X = sample_df.drop(columns=["churn", "customer_id"])
+        x = sample_df.drop(columns=["churn", "customer_id"])
         pipe = Pipeline([
             ("fe", FeatureEngineer()),
             ("pre", build_preprocessor()),
         ])
-        out = pipe.fit_transform(X)
+        out = pipe.fit_transform(x)
         assert out.shape[0] == len(sample_df)
         assert out.shape[1] > 0
 
     def test_no_nan_after_preprocessing(self, sample_df):
         from sklearn.pipeline import Pipeline
 
-        X = sample_df.drop(columns=["churn", "customer_id"])
+        x = sample_df.drop(columns=["churn", "customer_id"])
         pipe = Pipeline([
             ("fe", FeatureEngineer()),
             ("pre", build_preprocessor()),
         ])
-        out = pipe.fit_transform(X)
+        out = pipe.fit_transform(x)
         assert not np.isnan(out).any(), "NaN values found after preprocessing"

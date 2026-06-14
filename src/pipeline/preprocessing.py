@@ -10,7 +10,6 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler, OrdinalEncoder
 
-
 CATEGORICAL_FEATURES = [
     "gender",
     "senior_citizen",
@@ -43,11 +42,11 @@ ENGINEERED_FEATURES = [
 class FeatureEngineer(BaseEstimator, TransformerMixin):
     """Adds domain-derived features before encoding."""
 
-    def fit(self, X: pd.DataFrame, y=None) -> "FeatureEngineer":
+    def fit(self, x: pd.DataFrame, y=None) -> "FeatureEngineer":
         return self
 
-    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        df = X.copy()
+    def transform(self, x: pd.DataFrame) -> pd.DataFrame:
+        df = x.copy()
 
         df["tenure_group"] = pd.cut(
             df["tenure"].fillna(0),
