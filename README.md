@@ -100,6 +100,23 @@
 - **Predict Churn** — Live prediction form with risk gauge
 - **Model Performance** — CV AUC bars, SHAP importance chart, confusion matrix heatmap
 
+### 📓 EDA Notebook (`notebooks/01_exploratory_analysis.ipynb`)
+9 sections, 30 cells, all outputs pre-rendered:
+
+| Section | Content |
+|---|---|
+| Dataset overview | Shape, dtypes, missing value audit, descriptive stats |
+| Churn distribution | Bar + pie chart, class imbalance ratio (8.9:1) |
+| Numerical distributions | Histogram + KDE overlays + box plots for tenure, charges, service count |
+| Categorical analysis | Churn rate per category (bar charts + styled gradient table) |
+| Bivariate analysis | Tenure × charges scatter; tenure×contract and internet×payment heatmaps |
+| Correlation matrix | Lower-triangle Pearson matrix + top correlates with churn |
+| Customer segmentation | Rule-based High / Medium / Low risk segments with churn rates |
+| Key findings | Risk factors, protective factors, and modelling implications |
+
+![EDA Distributions](docs/screenshots/eda_num_dist.png)
+![EDA Heatmap](docs/screenshots/eda_heatmap_tenure_contract.png)
+
 ---
 
 ## 🚀 Quick Start
@@ -147,7 +164,8 @@ ChurnGuard/
 ├── models/
 │   ├── churn_model.joblib         # Trained sklearn Pipeline
 │   └── metadata.json              # Metrics + SHAP importances
-├── notebooks/                     # EDA notebooks
+├── notebooks/
+│   └── 01_exploratory_analysis.ipynb  # EDA: 9 sections, pre-rendered outputs
 ├── scripts/
 │   ├── generate_data.py           # Synthetic data generator
 │   └── train_model.py             # Training entry-point
