@@ -15,9 +15,12 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import plotly.io as pio
 import streamlit as st
 from plotly.subplots import make_subplots
 from scipy import stats
+
+pio.templates.default = "none"  # prevent Streamlit's template from injecting showlegend
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -158,9 +161,13 @@ PLOTLY_LAYOUT = dict(
     plot_bgcolor=COLORS["bg"],
     font=dict(color=COLORS["text"], family="Inter, sans-serif"),
     margin=dict(t=40, b=30, l=30, r=20),
-    showlegend=True,
     legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=COLORS["muted"])),
 )
+
+
+def layout(**extra):
+    """Merge PLOTLY_LAYOUT with extra kwargs into a single dict for update_layout()."""
+    return {**PLOTLY_LAYOUT, **extra}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -199,32 +206,27 @@ if page == "📊 Overview":
             .rename(columns={"mean": "Churn Rate", "count": "Customers"})
         )
         contract_churn["Churn Rate %"] = (contract_churn["Churn Rate"] * 100).round(1)
-        fig = px.bar(
-            contract_churn,
-            x="contract",
-            y="Churn Rate %",
-            color="contract",
-            color_discrete_sequence=[COLORS["danger"], COLORS["warning"], COLORS["success"]],
-            text="Churn Rate %",
-        )
-        fig.update_traces(texttemplate="%{text}%", textposition="outside")
-        fig.update_layout(**PLOTLY_LAYOUT, showlegend=False, xaxis_title="Contract", yaxis_title="Churn Rate (%)")
+        bar_colors = [COLORS["danger"], COLORS["warning"], COLORS["success"]]
+        fig = go.Figure([
+            go.Bar(
+                x=contract_churn["contract"],
+                y=contract_churn["Churn Rate %"],
+                marker_color=bar_colors[: len(contract_churn)],
+                text=[f"{v}%" for v in contract_churn["Churn Rate %"]],
+                textposition="outside",
+            )
+        ])
+        fig.update_layout(layout(showlegend=False, xaxis_title="Contract", yaxis_title="Churn Rate (%)"))
         st.plotly_chart(fig, use_container_width=True)
 
     with col_right:
         st.markdown('<div class="section-header">Monthly Charges Distribution</div>', unsafe_allow_html=True)
         fig2 = go.Figure()
-        for label, color in [("Churned (1)", COLORS["danger"]), ("Retained (0)", COLORS["success"])]:
-            val = 1 if "Churned" in label else 0
+        for label, color in [("Churned", COLORS["danger"]), ("Retained", COLORS["success"])]:
+            val = 1 if label == "Churned" else 0
             subset = df[df["churn"] == val]["monthly_charges"]
-            fig2.add_trace(go.Histogram(
-                x=subset,
-                name=label,
-                marker_color=color,
-                opacity=0.7,
-                nbinsx=30,
-            ))
-        fig2.update_layout(**PLOTLY_LAYOUT, barmode="overlay", xaxis_title="Monthly Charges ($)", yaxis_title="Count")
+            fig2.add_trace(go.Histogram(x=subset, name=label, marker_color=color, opacity=0.7, nbinsx=30))
+        fig2.update_layout(layout(barmode="overlay", xaxis_title="Monthly Charges ($)", yaxis_title="Count"))
         st.plotly_chart(fig2, use_container_width=True)
 
     col3, col4 = st.columns(2)
@@ -232,29 +234,27 @@ if page == "📊 Overview":
         st.markdown('<div class="section-header">Churn by Internet Service</div>', unsafe_allow_html=True)
         inet_churn = df.groupby("internet_service")["churn"].mean().reset_index()
         inet_churn["Churn Rate %"] = (inet_churn["churn"] * 100).round(1)
-        fig3 = px.pie(
-            inet_churn,
-            values="Churn Rate %",
-            names="internet_service",
-            color_discrete_sequence=[COLORS["info"], COLORS["danger"], COLORS["muted"]],
+        fig3 = go.Figure(go.Pie(
+            labels=inet_churn["internet_service"],
+            values=inet_churn["Churn Rate %"],
             hole=0.45,
-        )
-        fig3.update_layout(**PLOTLY_LAYOUT)
+            marker_colors=[COLORS["info"], COLORS["danger"], COLORS["muted"]],
+        ))
+        fig3.update_layout(layout())
         st.plotly_chart(fig3, use_container_width=True)
 
     with col4:
         st.markdown('<div class="section-header">Tenure vs Monthly Charges (Churn)</div>', unsafe_allow_html=True)
         sample = df.sample(min(1500, len(df)), random_state=42)
-        fig4 = px.scatter(
-            sample,
-            x="tenure",
-            y="monthly_charges",
-            color=sample["churn"].map({1: "Churned", 0: "Retained"}),
-            color_discrete_map={"Churned": COLORS["danger"], "Retained": COLORS["success"]},
-            opacity=0.5,
-            size_max=6,
-        )
-        fig4.update_layout(**PLOTLY_LAYOUT, xaxis_title="Tenure (months)", yaxis_title="Monthly Charges ($)")
+        fig4 = go.Figure()
+        for label, val, color in [("Churned", 1, COLORS["danger"]), ("Retained", 0, COLORS["success"])]:
+            sub = sample[sample["churn"] == val]
+            fig4.add_trace(go.Scatter(
+                x=sub["tenure"], y=sub["monthly_charges"],
+                mode="markers", name=label,
+                marker=dict(color=color, opacity=0.5, size=5),
+            ))
+        fig4.update_layout(layout(xaxis_title="Tenure (months)", yaxis_title="Monthly Charges ($)"))
         st.plotly_chart(fig4, use_container_width=True)
 
 
@@ -293,18 +293,24 @@ elif page == "🔬 Hypothesis Tests":
             if r.effect_size_label:
                 st.info(f"**Effect size** — {r.effect_size_label}")
 
-            st.success(r.conclusion) if r.rejected else st.warning(r.conclusion)
+            if r.rejected:
+                st.success(r.conclusion)
+            else:
+                st.warning(r.conclusion)
 
             if r.name == "contract_vs_churn" and "churn_by_contract" in r.additional:
                 data = r.additional["churn_by_contract"]
                 rows = [{"Contract": k, "Churn Rate": v["churn_rate"], "N": v["n"]} for k, v in data.items()]
                 chart_df = pd.DataFrame(rows)
                 chart_df["Churn Rate %"] = (chart_df["Churn Rate"] * 100).round(1)
-                fig = px.bar(chart_df, x="Contract", y="Churn Rate %", text="Churn Rate %",
-                             color="Contract",
-                             color_discrete_sequence=[COLORS["danger"], COLORS["warning"], COLORS["success"]])
-                fig.update_traces(texttemplate="%{text}%", textposition="outside")
-                fig.update_layout(**PLOTLY_LAYOUT, showlegend=False)
+                h_colors = [COLORS["danger"], COLORS["warning"], COLORS["success"]]
+                fig = go.Figure([go.Bar(
+                    x=chart_df["Contract"], y=chart_df["Churn Rate %"],
+                    marker_color=h_colors[: len(chart_df)],
+                    text=[f"{v}%" for v in chart_df["Churn Rate %"]],
+                    textposition="outside",
+                )])
+                fig.update_layout(layout(showlegend=False))
                 st.plotly_chart(fig, use_container_width=True)
 
             if r.name in ("monthly_charges_vs_churn", "tenure_vs_churn") and r.additional:
@@ -313,7 +319,7 @@ elif page == "🔬 Hypothesis Tests":
                 for label, group_val, color in [("Churned", 1, COLORS["danger"]), ("Retained", 0, COLORS["success"])]:
                     vals = df[df["churn"] == group_val][col].dropna()
                     fig.add_trace(go.Box(y=vals, name=label, marker_color=color, boxmean=True))
-                fig.update_layout(**PLOTLY_LAYOUT, yaxis_title=col.replace("_", " ").title())
+                fig.update_layout(layout(yaxis_title=col.replace("_", " ").title()))
                 st.plotly_chart(fig, use_container_width=True)
 
 
@@ -421,7 +427,7 @@ elif page == "🤖 Predict Churn":
                 },
             )
         )
-        gauge.update_layout(**PLOTLY_LAYOUT, height=280)
+        gauge.update_layout(layout(height=280))
         st.plotly_chart(gauge, use_container_width=True)
 
         if risk == "High":
@@ -467,7 +473,7 @@ elif page == "📈 Model Performance":
         ))
         fig.add_hline(y=cv_mean, line_dash="dash", line_color=COLORS["success"],
                       annotation_text=f"Mean AUC = {cv_mean:.4f}")
-        fig.update_layout(**PLOTLY_LAYOUT, yaxis_title="AUC-ROC", yaxis_range=[0.7, 1.0])
+        fig.update_layout(layout(yaxis_title="AUC-ROC", yaxis_range=[0.7, 1.0]))
         st.plotly_chart(fig, use_container_width=True)
         st.caption(f"CV AUC: {cv_mean:.4f} ± {cv_std:.4f}")
 
@@ -480,28 +486,27 @@ elif page == "📈 Model Performance":
                 .sort_values("SHAP Value", ascending=True)
                 .tail(12)
             )
-            fig2 = px.bar(
-                shap_df,
-                x="SHAP Value",
-                y="Feature",
-                orientation="h",
-                color="SHAP Value",
-                color_continuous_scale=["#3b82f6", "#7c3aed", "#ef4444"],
-            )
-            fig2.update_layout(**PLOTLY_LAYOUT, showlegend=False, coloraxis_showscale=False)
+            # Normalise SHAP values to [0,1] for colour mapping
+            vals = shap_df["SHAP Value"].values
+            norm = (vals - vals.min()) / (vals.max() - vals.min() + 1e-9)
+            bar_colors = [f"rgb({int(59+176*t)},{int(130-17*t)},{int(246-209*t)})" for t in norm]
+            fig2 = go.Figure(go.Bar(
+                x=shap_df["SHAP Value"], y=shap_df["Feature"],
+                orientation="h", marker_color=bar_colors,
+            ))
+            fig2.update_layout(layout(showlegend=False))
             st.plotly_chart(fig2, use_container_width=True)
 
     st.markdown('<div class="section-header">Confusion Matrix</div>', unsafe_allow_html=True)
     cm = metrics.get("confusion_matrix", [[0, 0], [0, 0]])
-    cm_fig = px.imshow(
-        cm,
-        text_auto=True,
-        labels=dict(x="Predicted", y="Actual"),
-        x=["Retained", "Churned"],
-        y=["Retained", "Churned"],
-        color_continuous_scale=["#1e2130", COLORS["primary"]],
-    )
-    cm_fig.update_layout(**PLOTLY_LAYOUT, width=450)
+    cm_fig = go.Figure(go.Heatmap(
+        z=cm, x=["Retained", "Churned"], y=["Retained", "Churned"],
+        text=[[str(v) for v in row] for row in cm],
+        texttemplate="%{text}",
+        colorscale=[[0, "#1e2130"], [1, COLORS["primary"]]],
+        showscale=False,
+    ))
+    cm_fig.update_layout(layout(width=450, xaxis_title="Predicted", yaxis_title="Actual"))
     st.plotly_chart(cm_fig)
 
     with st.expander("📋 Full Metadata"):
