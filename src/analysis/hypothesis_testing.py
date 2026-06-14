@@ -37,7 +37,7 @@ class HypothesisResult:
 
     @property
     def rejected(self) -> bool:
-        return self.p_value < self.alpha
+        return bool(self.p_value < self.alpha)
 
     @property
     def conclusion(self) -> str:
