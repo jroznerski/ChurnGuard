@@ -21,10 +21,7 @@ coverage.xml
 data/raw/*.csv
 data/processed/*.csv
 data/processed/*.parquet
-models/*.pkl
-models/*.joblib
-models/*.json
-!models/.gitkeep
+models/.gitkeep
 
 .DS_Store
 Thumbs.db
