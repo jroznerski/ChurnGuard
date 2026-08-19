@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from scripts.generate_data import generate_customers
 from src.pipeline.data_ingestion import DataIngestionError, DataIngestionPipeline
-from src.pipeline.preprocessing import FeatureEngineer, build_preprocessor
+from src.pipeline.preprocessing import FeatureEngineer, MissingValueHandler, build_preprocessor
 
 
 @pytest.fixture(scope="module")
@@ -68,6 +68,7 @@ class TestPreprocessor:
 
         x = sample_df.drop(columns=["churn", "customer_id"])
         pipe = Pipeline([
+            ("mh", MissingValueHandler()),
             ("fe", FeatureEngineer()),
             ("pre", build_preprocessor()),
         ])
@@ -80,6 +81,7 @@ class TestPreprocessor:
 
         x = sample_df.drop(columns=["churn", "customer_id"])
         pipe = Pipeline([
+            ("mh", MissingValueHandler()),
             ("fe", FeatureEngineer()),
             ("pre", build_preprocessor()),
         ])
