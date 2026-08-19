@@ -7,6 +7,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import argparse
 
+import yaml
+
 from loguru import logger
 
 from scripts.generate_data import generate_customers
@@ -43,9 +45,17 @@ def _run_baseline(df: pd.DataFrame, threshold: float = 0.45, random_state: int =
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train ChurnGuard model")
+    _cfg_path = "config/config.yaml"
+    _default_threshold = 0.45
+    if os.path.exists(_cfg_path):
+        with open(_cfg_path) as _f:
+            _cfg = yaml.safe_load(_f)
+        _default_threshold = _cfg.get("model", {}).get("threshold", 0.45)
+
     parser.add_argument("--data", default="data/raw/customers.csv")
     parser.add_argument("--model-dir", default="models")
-    parser.add_argument("--threshold", type=float, default=0.45)
+    parser.add_argument("--threshold", type=float, default=_default_threshold)
+    parser.add_argument("--tune", action="store_true", help="Run RandomizedSearchCV hyperparameter tuning")
     parser.add_argument("--generate", action="store_true", help="Regenerate synthetic data")
     args = parser.parse_args()
 
@@ -64,7 +74,7 @@ def main() -> None:
 
     _run_baseline(df, threshold=args.threshold)
     trainer = ModelTrainer(model_dir=args.model_dir, threshold=args.threshold)
-    metadata = trainer.train(df)
+    metadata = trainer.train(df, tune=args.tune)
 
     logger.success("Training complete.")
     logger.info(f"AUC-ROC : {metadata['metrics']['auc_roc']}")
