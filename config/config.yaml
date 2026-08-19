@@ -52,7 +52,17 @@ model:
     use_label_encoder: false
     random_state: 42
   cross_val_folds: 5
-  threshold: 0.45
+  threshold: 0.45        # fallback; overridden at training time by val-set search
+  risk_high_threshold: 0.70
+  tune:
+    n_iter: 30
+    scoring: roc_auc
+    param_distributions:
+      n_estimators: [100, 200, 300, 400]
+      max_depth: [3, 4, 5, 6, 7]
+      learning_rate: [0.01, 0.05, 0.1, 0.2]
+      subsample: [0.6, 0.7, 0.8, 0.9]
+      colsample_bytree: [0.6, 0.7, 0.8, 0.9]
 
 hypothesis_tests:
   alpha: 0.05
