@@ -7,6 +7,8 @@ import threading
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -51,8 +53,16 @@ class ChurnPredictor:
         else:
             self._metadata = {}
 
+        cfg_path = Path("config/config.yaml")
+        if cfg_path.exists():
+            with open(cfg_path) as _f:
+                _cfg = yaml.safe_load(_f)
+            self._risk_high = float(_cfg.get("model", {}).get("risk_high_threshold", 0.70))
+        else:
+            self._risk_high = 0.70
+
         self._initialized = True
-        logger.info(f"Model loaded from {model_path} | threshold={self._threshold}")
+        logger.info(f"Model loaded from {model_path} | threshold={self._threshold} | risk_high={self._risk_high}")
 
     def _check_loaded(self) -> None:
         if not getattr(self, "_initialized", False):
@@ -63,7 +73,7 @@ class ChurnPredictor:
         df = pd.DataFrame([features])
         proba = self._pipeline.predict_proba(df)[0, 1]
         label = int(proba >= self._threshold)
-        risk = "High" if proba >= 0.7 else "Medium" if proba >= 0.4 else "Low"
+        risk = "High" if proba >= self._risk_high else ("Medium" if proba >= self._threshold else "Low")
         return {
             "churn_probability": round(float(proba), 4),
             "churn_prediction": label,
@@ -78,7 +88,7 @@ class ChurnPredictor:
         results = []
         for i, proba in enumerate(probas):
             label = int(proba >= self._threshold)
-            risk = "High" if proba >= 0.7 else "Medium" if proba >= 0.4 else "Low"
+            risk = "High" if proba >= self._risk_high else ("Medium" if proba >= self._threshold else "Low")
             results.append(
                 {
                     "index": i,
