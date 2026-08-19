@@ -38,6 +38,30 @@ ENGINEERED_FEATURES = [
 ]
 
 
+NUMERICAL_MISSING_COLS = ["tenure", "monthly_charges", "total_charges"]
+MISSING_FLAG_FEATURES = [f"{c}_missing" for c in NUMERICAL_MISSING_COLS]
+
+
+class MissingValueHandler(BaseEstimator, TransformerMixin):
+    """Adds binary missing-indicator columns then median-imputes numericals.
+
+    Must run before FeatureEngineer so derived features (charges_per_month_ratio,
+    tenure_group) operate on already-imputed values without ad-hoc fillna().
+    """
+
+    def fit(self, x: pd.DataFrame, y=None) -> "MissingValueHandler":
+        self.medians_ = {c: x[c].median() for c in NUMERICAL_MISSING_COLS if c in x.columns}
+        return self
+
+    def transform(self, x: pd.DataFrame) -> pd.DataFrame:
+        df = x.copy()
+        for col in NUMERICAL_MISSING_COLS:
+            if col in df.columns:
+                df[f"{col}_missing"] = df[col].isna().astype(int)
+                df[col] = df[col].fillna(self.medians_.get(col, 0))
+        return df
+
+
 class FeatureEngineer(BaseEstimator, TransformerMixin):
     """Adds domain-derived features before encoding."""
 
@@ -48,14 +72,14 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         df = x.copy()
 
         df["tenure_group"] = pd.cut(
-            df["tenure"].fillna(0),
+            df["tenure"],
             bins=[-1, 12, 24, 48, 72],
             labels=["0-1yr", "1-2yr", "2-4yr", "4+yr"],
         ).astype(str)
 
-        safe_tenure = df["tenure"].fillna(0).replace(0, 1)
+        safe_tenure = df["tenure"].replace(0, 1)
         df["charges_per_month_ratio"] = (
-            df["total_charges"].fillna(0) / safe_tenure
+            df["total_charges"] / safe_tenure
         ).round(4)
 
         service_cols = [
@@ -84,7 +108,7 @@ def build_preprocessor() -> ColumnTransformer:
         "charges_per_month_ratio",
         "service_count",
         "has_premium_services",
-    ]
+    ] + MISSING_FLAG_FEATURES
 
     cat_pipeline = Pipeline(
         steps=[
