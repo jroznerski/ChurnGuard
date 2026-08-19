@@ -72,8 +72,10 @@ def _cramers_v(chi2: float, n: int, k: int, r: int) -> float:
 
 
 def _cohens_d(a: np.ndarray, b: np.ndarray) -> float:
-    """Cohen's d for two independent groups."""
-    pooled_std = np.sqrt((a.std(ddof=1) ** 2 + b.std(ddof=1) ** 2) / 2)
+    """Cohen's d — pooled SD weighted by degrees of freedom."""
+    n1, n2 = len(a), len(b)
+    s1, s2 = a.std(ddof=1), b.std(ddof=1)
+    pooled_std = np.sqrt(((n1 - 1) * s1 ** 2 + (n2 - 1) * s2 ** 2) / (n1 + n2 - 2))
     return float((a.mean() - b.mean()) / pooled_std) if pooled_std > 0 else 0.0
 
 
@@ -146,7 +148,7 @@ class HypothesisTester:
     def test_monthly_charges_vs_churn(self) -> HypothesisResult:
         churned = self.df.loc[self.df["churn"] == 1, "monthly_charges"].dropna()
         retained = self.df.loc[self.df["churn"] == 0, "monthly_charges"].dropna()
-        t, p = stats.ttest_ind(churned, retained, equal_var=False)
+        t, p = stats.ttest_ind(churned, retained, equal_var=False, alternative="greater")
         d = _cohens_d(churned.values, retained.values)
         effect_label = _label_effect(d, (0.2, 0.5, 0.8))
 
