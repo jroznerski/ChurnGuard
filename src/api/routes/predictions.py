@@ -43,7 +43,7 @@ def _risk_explanation(risk: str, proba: float) -> str:
     status_code=status.HTTP_200_OK,
     summary="Predict churn for a single customer",
 )
-async def predict_single(customer: CustomerFeatures) -> PredictionResponse:
+def predict_single(customer: CustomerFeatures) -> PredictionResponse:
     try:
         result = predictor.predict_single(customer.model_dump())
     except ModelNotLoadedError as exc:
@@ -64,7 +64,7 @@ async def predict_single(customer: CustomerFeatures) -> PredictionResponse:
     status_code=status.HTTP_200_OK,
     summary="Predict churn for up to 1 000 customers",
 )
-async def predict_batch(request: BatchPredictionRequest) -> BatchPredictionResponse:
+def predict_batch(request: BatchPredictionRequest) -> BatchPredictionResponse:
     t0 = time.perf_counter()
     records = [c.model_dump() for c in request.customers]
     try:
