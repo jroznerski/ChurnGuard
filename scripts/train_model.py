@@ -12,6 +12,33 @@ from loguru import logger
 from scripts.generate_data import generate_customers
 from src.pipeline.data_ingestion import DataIngestionPipeline
 from src.pipeline.model_trainer import ModelTrainer
+from src.pipeline.preprocessing import FeatureEngineer, build_preprocessor
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score, f1_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline as SkPipeline
+import pandas as pd
+
+
+def _run_baseline(df: pd.DataFrame, threshold: float = 0.45, random_state: int = 42) -> None:
+    """Logistic regression baseline — reference point for XGBoost comparison."""
+    target = "churn"
+    x = df.drop(columns=[c for c in [target, "customer_id"] if c in df.columns])
+    y = df[target]
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=random_state, stratify=y
+    )
+    pipe = SkPipeline([
+        ("fe", FeatureEngineer()),
+        ("pre", build_preprocessor()),
+        ("lr", LogisticRegression(max_iter=1000, class_weight="balanced", random_state=random_state)),
+    ])
+    pipe.fit(x_train, y_train)
+    proba = pipe.predict_proba(x_test)[:, 1]
+    y_pred = (proba >= threshold).astype(int)
+    auc = roc_auc_score(y_test, proba)
+    f1 = f1_score(y_test, y_pred)
+    logger.info(f"Baseline LR  — AUC: {auc:.4f} | F1: {f1:.4f}")
 
 
 def main() -> None:
@@ -35,6 +62,7 @@ def main() -> None:
     ingestion = DataIngestionPipeline(args.data)
     df = ingestion.load()
 
+    _run_baseline(df, threshold=args.threshold)
     trainer = ModelTrainer(model_dir=args.model_dir, threshold=args.threshold)
     metadata = trainer.train(df)
 
