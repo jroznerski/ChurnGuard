@@ -8,7 +8,7 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker)](https://www.docker.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **End-to-end machine learning system** that predicts customer churn in real time — from raw data ingestion through statistical hypothesis testing, XGBoost modelling with SHAP explainability, a production-grade FastAPI REST backend, and an interactive Streamlit analytics dashboard.
+> **End-to-end machine learning system** that predicts customer churn in real time — from raw data ingestion through statistical hypothesis testing, XGBoost modelling with SHAP explainability, a deployment-ready FastAPI REST backend, and an interactive Streamlit analytics dashboard.
 
 ---
 
@@ -70,7 +70,7 @@
 | **Schema validation** | Column presence, type casting, missing-value audit at ingestion |
 | **Feature engineering** | `tenure_group`, `charges_per_month_ratio`, `service_count`, `has_premium_services` |
 | **Preprocessing** | `OrdinalEncoder` + `MinMaxScaler` via `ColumnTransformer` sklearn Pipeline |
-| **Model** | `XGBClassifier` — 300 trees, depth 6, class-weight balanced |
+| **Model** | `XGBClassifier` — 300 trees, depth 6, `scale_pos_weight=2.5` |
 | **Evaluation** | 5-fold stratified CV + hold-out AUC-ROC, F1, precision, recall |
 | **Explainability** | SHAP `TreeExplainer` — top-15 feature importances persisted to metadata |
 
@@ -248,7 +248,7 @@ curl -X POST http://localhost:8000/api/v1/predictions/predict \
 | Layer | Technology |
 |---|---|
 | Language | Python 3.10+ |
-| ML | XGBoost, scikit-learn, imbalanced-learn |
+| ML | XGBoost, scikit-learn |
 | Explainability | SHAP |
 | Statistics | SciPy, statsmodels |
 | API | FastAPI, Pydantic v2, Uvicorn |
