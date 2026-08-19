@@ -18,12 +18,13 @@ from sklearn.metrics import (
     f1_score,
     roc_auc_score,
 )
-from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
+from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold, cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 
 from src.pipeline.preprocessing import (
     FeatureEngineer,
+    MissingValueHandler,
     build_preprocessor,
     get_feature_names,
 )
@@ -58,6 +59,7 @@ class ModelTrainer:
         )
         return Pipeline(
             steps=[
+                ("missing_handler", MissingValueHandler()),
                 ("feature_engineer", FeatureEngineer()),
                 ("preprocessor", build_preprocessor()),
                 ("classifier", xgb),
@@ -109,7 +111,43 @@ class ModelTrainer:
         top = sorted(importance.items(), key=lambda x: x[1], reverse=True)[:15]
         return dict(top)
 
-    def train(self, df: pd.DataFrame) -> dict[str, Any]:
+    def _tune_hyperparams(self, x_train: pd.DataFrame, y_train: pd.Series) -> Pipeline:
+        """RandomizedSearchCV over XGBoost hyperparams; returns best fitted pipeline."""
+        param_dist = {
+            "classifier__n_estimators": [100, 200, 300, 400],
+            "classifier__max_depth": [3, 4, 5, 6, 7],
+            "classifier__learning_rate": [0.01, 0.05, 0.1, 0.2],
+            "classifier__subsample": [0.6, 0.7, 0.8, 0.9],
+            "classifier__colsample_bytree": [0.6, 0.7, 0.8, 0.9],
+        }
+        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=self.random_state)
+        search = RandomizedSearchCV(
+            self._build_pipeline(),
+            param_dist,
+            n_iter=30,
+            scoring="roc_auc",
+            cv=cv,
+            random_state=self.random_state,
+            n_jobs=-1,
+            verbose=1,
+        )
+        search.fit(x_train, y_train)
+        logger.info(f"Tuning best CV AUC: {search.best_score_:.4f} | {search.best_params_}")
+        return search.best_estimator_
+
+    def _find_threshold(self, pipeline: Pipeline, x_val: pd.DataFrame, y_val: pd.Series) -> float:
+        """Find threshold maximising F1 on the validation split."""
+        probas = pipeline.predict_proba(x_val)[:, 1]
+        best_t, best_f1 = 0.5, 0.0
+        for t in np.linspace(0.1, 0.9, 81):
+            f1 = f1_score(y_val, (probas >= t).astype(int), zero_division=0)
+            if f1 > best_f1:
+                best_f1, best_t = f1, float(t)
+        logger.info(f"Optimal threshold: {best_t:.2f} (val F1={best_f1:.4f})")
+        return round(best_t, 2)
+
+
+    def train(self, df: pd.DataFrame, tune: bool = False) -> dict[str, Any]:
         target = "churn"
         drop_cols = [target, "customer_id"]
         x = df.drop(columns=[c for c in drop_cols if c in df.columns])
@@ -119,11 +157,22 @@ class ModelTrainer:
             x, y, test_size=self.test_size, random_state=self.random_state, stratify=y
         )
 
-        pipeline = self._build_pipeline()
-        logger.info("Starting cross-validation …")
-        cv_metrics = self._cross_validate(pipeline, x_train, y_train)
+        x_train_sub, x_val, y_train_sub, y_val = train_test_split(
+            x_train, y_train, test_size=0.2, random_state=self.random_state, stratify=y_train
+        )
 
-        logger.info("Training final model …")
+        if tune:
+            logger.info("Running RandomizedSearchCV …")
+            pipeline = self._tune_hyperparams(x_train, y_train)
+        else:
+            pipeline = self._build_pipeline()
+            logger.info("Starting cross-validation …")
+            cv_metrics = self._cross_validate(pipeline, x_train, y_train)
+            logger.info("Training final model …")
+            pipeline.fit(x_train_sub, y_train_sub)
+
+        logger.info("Selecting threshold on validation set …")
+        self.threshold = self._find_threshold(pipeline, x_val, y_val)
         pipeline.fit(x_train, y_train)
 
         eval_metrics = self._evaluate(pipeline, x_test, y_test)
@@ -136,7 +185,7 @@ class ModelTrainer:
             "train_size": len(x_train),
             "test_size": len(x_test),
             "churn_rate": round(float(y.mean()), 4),
-            "metrics": {**cv_metrics, **eval_metrics},
+            "metrics": {**(cv_metrics if not tune else {}), **eval_metrics},
             "shap_feature_importance": shap_importances,
         }
 
