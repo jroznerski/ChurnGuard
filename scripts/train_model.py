@@ -7,19 +7,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import argparse
 
+import pandas as pd
 import yaml
-
 from loguru import logger
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score, roc_auc_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline as SkPipeline
 
 from scripts.generate_data import generate_customers
 from src.pipeline.data_ingestion import DataIngestionPipeline
 from src.pipeline.model_trainer import ModelTrainer
 from src.pipeline.preprocessing import FeatureEngineer, build_preprocessor
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score, f1_score
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline as SkPipeline
-import pandas as pd
 
 
 def _run_baseline(df: pd.DataFrame, threshold: float = 0.45, random_state: int = 42) -> None:
